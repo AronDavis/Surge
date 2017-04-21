@@ -1,0 +1,252 @@
+<html>
+	<head>
+		<script src=" https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.js"></script>
+		<script>
+		class Canvas
+        {
+            constructor(zoom, element, width, height)
+            {
+                this.zoom = zoom;
+                this.element = element;
+				this.width = width;
+				this.height = height;
+				
+				this.resize();
+            }
+
+            resize()
+            {
+                this.element.attr("width", this.zoom * this.width)
+                this.element.attr("height", this.zoom * this.height)
+				this.element.css("width", this.zoom * this.width + "px");
+				this.element.css("height", this.zoom * this.height + "px");
+            }
+        }
+		</script>
+		<script>
+			class Board
+			{
+				constructor(canvas)
+				{
+					this.canvas = canvas;
+					
+					this.floodHeads = [];
+					this.colors = [];
+					
+					this.tiles = {};
+					for(var x = 0; x < this.canvas.width; x++)
+					{
+						this.tiles[x] = {};
+						
+						for(var y = 0; y < this.canvas.height; y++)
+							this.tiles[x][y] = null;
+					}	
+				}
+				
+				startFlood(floodHead, x, y)
+				{
+					floodHead.board = this;
+					floodHead.x = x;
+					floodHead.y = y;
+					
+					var team = this.colors.indexOf(floodHead.color);
+					
+					if(team > -1)
+					{
+						floodHead.team = team;
+						this.floodHeads[team].push(floodHead);
+					}
+					else
+					{
+						team = this.floodHeads.length;
+						floodHead.team = team;
+						this.floodHeads.push([floodHead]);
+						this.colors.push(floodHead.color);
+					}
+					
+					this.tiles[x][y] = floodHead;
+				}
+				
+				addPixel(pixel, x, y)
+				{
+					this.tiles[x][y] = pixel;
+					pixel.x = x;
+					pixel.y = y;
+				}
+				
+				onTick()
+				{
+					var that = this;
+					if(that.floodHeads != null)
+					{
+						for(var team = 0; team < that.colors.length; team++)
+						{
+							var teamHeads = that.floodHeads[team];
+							
+							var headsToRemove = [];
+							var headsToAdd  = [];
+							
+							var nullsExist = false;
+							for(var i = 0; i < teamHeads.length; i++)
+							{
+								var head = teamHeads[i];
+								
+								for(var x = -1; x <= 1; x++)
+									for(var y = -1; y <= 1; y++)
+									{
+										if(x == 0 && y == 0)
+											continue;
+										 
+										var finalX = head.x + x;
+										var finalY = head.y + y;
+										
+										if(finalX < 0 || finalY < 0 || finalX >= that.canvas.width || finalY >= that.canvas.height)
+											continue;
+										
+										var tile = that.tiles[finalX][finalY];
+										
+										if(tile == null)
+										{
+											nullsExist = true;
+											break;
+										}
+									}
+							}
+							
+							for(var i = 0; i < teamHeads.length; i++)
+							{
+								var head = teamHeads[i];
+								
+								var didTransfer = false;
+								
+								for(var x = -1; x <= 1; x++)
+									for(var y = -1; y <= 1; y++)
+									{
+										if(x == 0 && y == 0)
+											continue;
+										 
+										var finalX = head.x + x;
+										var finalY = head.y + y;
+										
+										if(finalX < 0 || finalY < 0 || finalX >= that.canvas.width || finalY >= that.canvas.height)
+											continue;
+										
+										var tile = that.tiles[finalX][finalY];
+										
+										if(tile == null)
+										{
+											var newPixel = new Pixel(head.color);
+											newPixel.team = team;
+											headsToAdd.push(newPixel);
+											that.addPixel(newPixel, finalX, finalY);
+										}
+									}
+								
+								//if there are no nulls to take over
+								if(!nullsExist)
+								{
+									for(var x = -1; x <= 1; x++)
+										for(var y = -1; y <= 1; y++)
+										{
+											if(x == 0 && y == 0)
+												continue;
+												
+											var finalX = head.x + x;
+											var finalY = head.y + y;
+											
+											if(finalX < 0 || finalY < 0 || finalX >= that.canvas.width || finalY >= that.canvas.height)
+												continue;
+											
+											var tile = that.tiles[finalX][finalY];
+											
+											if(tile != null && tile.team != team)
+											{
+												//remove what we ran into
+												if(that.floodHeads[tile.team].indexOf(tile) > -1)
+													headsToRemove.push(tile);
+											
+												var newPixel = new Pixel(head.color);
+												newPixel.team = team;
+												headsToAdd.push(newPixel);
+												that.addPixel(newPixel, finalX, finalY);
+											}
+										}
+								}
+
+								headsToRemove.push(head);
+							}
+							
+							//will always be our team
+							for(var i = 0; i < headsToAdd.length; i++)
+								that.floodHeads[team].push(headsToAdd[i]);
+							
+							for(var i = 0; i < headsToRemove.length; i++)
+							{
+								var pixel = headsToRemove[i];
+								var index = that.floodHeads[pixel.team].indexOf(pixel);	
+								that.floodHeads[pixel.team].splice(index, 1);
+							}
+						}
+					}
+					
+					var context = that.canvas.element[0].getContext("2d");
+					for(var x = 0; x < that.canvas.width; x++)
+					{
+						for(var y = 0; y < that.canvas.height; y++)
+						{
+							var tile = that.tiles[x][y];
+							var zoom = that.canvas.zoom;
+							
+							if(tile == null)
+								context.fillStyle = "#000";
+							else
+								context.fillStyle = "#" + tile.color;
+								
+							context.fillRect(y * zoom, x * zoom, zoom, zoom);
+ 						}
+					}
+				}
+			}
+		</script>
+		<script>
+		class Pixel
+        {
+            constructor(color)
+            {
+                this.color = color;
+            }
+        }
+		</script>
+		<script>
+			$(function ()
+			{
+				var canvas = new Canvas(5, $("#canvas"), 50, 50);
+				var board = new Board(canvas);
+				
+				function onTick()
+				{
+					board.onTick();
+				}
+				
+				var ticker = setInterval(onTick, 50);
+				
+				/*
+				board.startFlood(new Pixel("69f"),canvas.width-1,canvas.height-1);
+				board.startFlood(new Pixel("acf"),0,0);
+				board.startFlood(new Pixel("0ff"), Math.floor(canvas.width/2),Math.floor(canvas.height/2));
+				*/
+				
+				for(var i = 0; i < 5; i++)
+					board.startFlood(new Pixel(
+							 Math.floor(Math.random() * 10) + "" + Math.floor(Math.random() * 10) + "" + Math.floor(Math.random() * 10)
+							),
+							Math.floor(Math.random() * canvas.width),
+							Math.floor(Math.random() * canvas.height)
+						);
+			});
+		</script>
+	</head>
+	<body>
+		<canvas id='canvas' style="transform: rotate(-90deg);">Your browser does not support the HTML5 canvas tag.</canvas>
+	</body>
+</html>
