@@ -87,31 +87,6 @@
 							var headsToAdd  = [];
 							
 							var nullsExist = false;
-							for(var i = 0; i < teamHeads.length; i++)
-							{
-								var head = teamHeads[i];
-								
-								for(var x = -1; x <= 1; x++)
-									for(var y = -1; y <= 1; y++)
-									{
-										if(x == 0 && y == 0)
-											continue;
-										 
-										var finalX = head.x + x;
-										var finalY = head.y + y;
-										
-										if(finalX < 0 || finalY < 0 || finalX >= that.canvas.width || finalY >= that.canvas.height)
-											continue;
-										
-										var tile = that.tiles[finalX][finalY];
-										
-										if(tile == null)
-										{
-											nullsExist = true;
-											break;
-										}
-									}
-							}
 							
 							for(var i = 0; i < teamHeads.length; i++)
 							{
@@ -135,6 +110,8 @@
 										
 										if(tile == null)
 										{
+											nullsExist = true;
+											
 											var newPixel = new Pixel(head.color);
 											newPixel.team = team;
 											headsToAdd.push(newPixel);
